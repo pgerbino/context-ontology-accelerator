@@ -32,7 +32,7 @@ from collections import Counter
 from coa_common.bedrock import BedrockTruncationError
 from coa_common.domain_models import EnrichmentSource, ForeignKey, ReviewStatus, Table
 
-from coa_sources.database.enrichment.bedrock_client import BedrockClient
+from coa_sources.database.enrichment.bedrock_client import LLMClient
 from coa_sources.database.enrichment.relationship_inferrer import (
     _has_protected_fk,
     _infer_batch_raw,
@@ -145,7 +145,7 @@ def _build_prompt_for(tables: list[Table], alias_by_ds: dict[str, str], labels: 
 
 def infer_cross_source_relationships(
     tables: list[Table],
-    client: BedrockClient,
+    client: LLMClient,
     emitter: EnrichmentMetricEmitter,
     *,
     focus_datasource_id: str | None = None,
@@ -217,7 +217,7 @@ def _infer_pair(
     pair_tables: list[Table],
     alias_by_ds: dict[str, str],
     labels: dict[int, str],
-    client: BedrockClient,
+    client: LLMClient,
     emitter: EnrichmentMetricEmitter,
 ) -> list[dict]:
     """One bounded Bedrock call over the tables of exactly two sources."""

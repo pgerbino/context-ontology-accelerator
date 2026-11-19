@@ -260,19 +260,29 @@ class _RetryingClient:
 
 
 def _build_signed_client(endpoint: str, region: str, timeout: int) -> OpenSearch:
-    host = endpoint.replace("https://", "").replace("http://", "").rstrip("/")
-    credentials = boto3.Session().get_credentials()
-    if credentials is None:
+    """Build an opensearch-py client for the endpoint.
+
+    AOSS endpoints (``https://…aoss…on.aws``) get a SigV4-signed client. Plain
+    HTTP endpoints (``http://localhost:9200`` — the local podman OpenSearch, no
+    AWS involved) get an unsigned, plain-text client so the full stack runs
+    without AWS.
+    """
+    parsed = _parse_endpoint(endpoint)
+    credentials = None if parsed["plain_http"] else boto3.Session().get_credentials()
+    if credentials is None and not parsed["plain_http"]:
         raise RuntimeError("AWS credentials not available")
-    # LIVE credentials object (not a frozen snapshot): AWSV4SignerAuth re-signs
-    # each request with current creds, so a cached client survives Fargate
-    # task-role token rotation. Service must be "aoss" (defaults to "es").
-    auth = AWSV4SignerAuth(credentials, region, _AOSS_SERVICE)
+    if credentials is not None:
+        # LIVE credentials object (not a frozen snapshot): AWSV4SignerAuth re-signs
+        # each request with current creds, so a cached client survives Fargate
+        # task-role token rotation. Service must be "aoss" (defaults to "es").
+        auth: Any = AWSV4SignerAuth(credentials, region, _AOSS_SERVICE)
+    else:
+        auth = None
     return OpenSearch(
-        hosts=[{"host": host, "port": 443}],
+        hosts=[{"host": parsed["host"], "port": parsed["port"]}],
         http_auth=auth,
-        use_ssl=True,
-        verify_certs=True,
+        use_ssl=parsed["use_ssl"],
+        verify_certs=parsed["use_ssl"],
         connection_class=RequestsHttpConnection,
         timeout=timeout,
         # Size to the WIDEST inducer ThreadPoolExecutor that shares this client so
@@ -288,6 +298,26 @@ def _build_signed_client(endpoint: str, region: str, timeout: int) -> OpenSearch
             10,
         ),
     )
+
+
+def _parse_endpoint(endpoint: str) -> dict[str, Any]:
+    """Split an OpenSearch endpoint into host/port/ssl flags.
+
+    ``https://…`` → SSL on, port 443 unless specified; ``http://…`` (local
+    OpenSearch) → plain text, port 80 unless specified.
+    """
+    scheme, _, rest = endpoint.partition("://")
+    plain_http = scheme.lower() == "http"
+    use_ssl = not plain_http
+    if ":" in rest:
+        host, _, port = rest.rpartition(":")
+    else:
+        host, port = rest, ("80" if plain_http else "443")
+    try:
+        port = int(port)
+    except ValueError:
+        port = 80 if plain_http else 443
+    return {"host": host.rstrip("/"), "port": port, "use_ssl": use_ssl, "plain_http": plain_http}
 
 
 def _filter_clause(filters: list[dict] | None) -> dict | None:

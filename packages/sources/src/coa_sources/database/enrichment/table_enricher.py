@@ -29,7 +29,7 @@ from coa_common.domain_models import (
 )
 from coa_common.metadata_store.reader import read_assets_for_datasource
 
-from coa_sources.database.enrichment.bedrock_client import BedrockClient
+from coa_sources.database.enrichment.bedrock_client import LLMClient, get_llm_client
 from coa_sources.database.enrichment.prompts import build_system_prompt, build_user_prompt_segments
 from coa_sources.database.pipeline.enrichment_metrics import (
     EnrichmentMetricEmitter,
@@ -192,7 +192,7 @@ def run(
         return {"tables_enriched": 0, "tables_failed": 0, "tables_skipped_unchanged": 0, "failed_table_ids": []}
 
     guardrail_id = _resolve_guardrail_id()
-    client = BedrockClient(read_timeout=TABLE_TIMEOUT_SEC, guardrail_id=guardrail_id)
+    client = get_llm_client(read_timeout=TABLE_TIMEOUT_SEC, guardrail_id=guardrail_id)
     system_prompt = build_system_prompt(namespace_language)
     logger.info("Enrichment language for datasource %s: %s", datasource_id, namespace_language)
 
@@ -466,7 +466,7 @@ def _call_bedrock(
     table_name: str,
     database: str,
     columns: list[Column],
-    client: BedrockClient,
+    client: LLMClient,
     emitter: EnrichmentMetricEmitter,
     *,
     system_prompt: str,

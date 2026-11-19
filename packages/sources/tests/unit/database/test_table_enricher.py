@@ -132,7 +132,7 @@ class TestApplyResult:
 class TestRun:
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_enriches_tables(self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock) -> None:
         mock_client_cls.return_value.invoke.return_value = _mock_invocation_result()
         mock_read.return_value = [_make_table("t1"), _make_table("t2")]
@@ -145,7 +145,7 @@ class TestRun:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_handles_failures(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -161,7 +161,7 @@ class TestRun:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_count_partition_invariant_holds(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -200,7 +200,7 @@ class TestRun:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_emits_throttle_metric_on_terminal_throttle(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -221,7 +221,7 @@ class TestRun:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_no_tables(self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock) -> None:
         mock_read.return_value = []
 
@@ -250,7 +250,7 @@ class TestRunProgress:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_final_publish_reaches_total(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -274,7 +274,7 @@ class TestRunProgress:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_reviewed_tables_are_processed_before_any_bedrock_call(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -298,7 +298,7 @@ class TestRunProgress:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_publishes_per_table_once_the_throttle_elapses(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock, monkeypatch
     ) -> None:
@@ -321,7 +321,7 @@ class TestRunProgress:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_failed_table_still_counts_as_processed(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -345,7 +345,7 @@ class TestRunProgress:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_publish_failure_does_not_fail_the_run(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -430,7 +430,7 @@ class TestParallelChunkDispatch:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_large_table_submits_multiple_batches(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -446,7 +446,7 @@ class TestParallelChunkDispatch:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_small_table_submits_single_call(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -469,7 +469,7 @@ class TestPerTableTimeout:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_read_timeout_surfaces_as_table_failed(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -485,7 +485,7 @@ class TestPerTableTimeout:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_timeout_on_one_table_does_not_block_others(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -520,7 +520,7 @@ class TestRetryConfig:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_5xx_error_surfaces_as_table_failed(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -540,7 +540,7 @@ class TestExistingMetadataPassThrough:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_existing_fks_passed_to_prompt(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -568,7 +568,7 @@ class TestExistingMetadataPassThrough:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_existing_pk_passed_to_prompt(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -587,7 +587,7 @@ class TestExistingMetadataPassThrough:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_pass1_sends_segments_with_only_source_data_guarded(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -610,7 +610,7 @@ class TestMetricEmissionDuringEnrichment:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_emitter_receives_pass1_invocation_metrics(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -630,7 +630,7 @@ class TestMetricEmissionDuringEnrichment:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_emitter_receives_pass2_invocation_metrics(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -648,7 +648,7 @@ class TestMetricEmissionDuringEnrichment:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_emitter_receives_error_on_bedrock_failure(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -665,7 +665,7 @@ class TestMetricEmissionDuringEnrichment:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_multiple_tables_emit_multiple_pass1_metrics(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -683,7 +683,7 @@ class TestMetricEmissionDuringEnrichment:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_no_tables_no_emitter_calls(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -742,7 +742,7 @@ class TestGuardrailBlockedPath:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_guardrail_blocked_marks_table_failed(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -760,7 +760,7 @@ class TestGuardrailBlockedPath:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_guardrail_blocked_one_table_others_succeed(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -782,7 +782,7 @@ class TestGuardrailBlockedPath:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_guardrail_blocked_returns_failed_table_ids(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -799,7 +799,7 @@ class TestGuardrailBlockedPath:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_all_succeed_returns_empty_failed_table_ids(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -817,7 +817,7 @@ class TestBedrockTruncationPath:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_truncation_marks_table_failed_and_preserves_typed_error(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1059,7 +1059,7 @@ class TestIncompleteBatchDetection:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_partial_batch_failure_preserves_succeeded_batches(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1096,7 +1096,7 @@ class TestIncompleteBatchDetection:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_all_batches_fail_marks_table_failed(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1116,7 +1116,7 @@ class TestIncompleteBatchDetection:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_partial_enrichment_emits_metric_and_logs(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1142,7 +1142,7 @@ class TestIncompleteBatchDetection:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_fully_succeeded_table_is_not_partial(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1159,7 +1159,7 @@ class TestIncompleteBatchDetection:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_batch_zero_failure_keeps_columns_and_does_not_blank_description(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1213,7 +1213,7 @@ class TestPass2FailureFallback:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_pass2_failure_still_writes_pass1_results(
         self,
         mock_client_cls: MagicMock,
@@ -1340,7 +1340,7 @@ class TestCallBedrockMaxTokens:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_extra_context_uses_16384_tokens(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1363,7 +1363,7 @@ class TestCallBedrockMaxTokens:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_plain_wide_table_without_extra_context_uses_16384_tokens(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1437,7 +1437,7 @@ class TestEmptyDescriptionFallback:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_emits_tables_missing_description(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1455,7 +1455,7 @@ class TestEmptyDescriptionFallback:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_emits_zero_when_all_described(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:
@@ -1594,7 +1594,7 @@ class TestReScanPreservesReviewedItems:
 
     @patch("coa_sources.database.enrichment.table_enricher._write_enriched_assets")
     @patch("coa_sources.database.enrichment.table_enricher.read_assets_for_datasource")
-    @patch("coa_sources.database.enrichment.table_enricher.BedrockClient")
+    @patch("coa_sources.database.enrichment.table_enricher.get_llm_client")
     def test_run_skips_fully_approved_table(
         self, mock_client_cls: MagicMock, mock_read: MagicMock, mock_write: MagicMock
     ) -> None:

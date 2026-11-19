@@ -23,8 +23,9 @@ from dataclasses import dataclass, replace
 
 import graphrag_toolkit.lexical_graph.config as _graphrag_cfg
 import structlog
-from coa_common import make_llama_index_embedding, resolve_region
+from coa_common import resolve_region
 from coa_common.constants import DEFAULT_EMBED_DIMENSIONS, DEFAULT_EMBED_MODEL_ID
+from coa_common.llm import get_llama_index_embedding
 
 from ..graph_context import (
     SUPPORTING_STATEMENTS_KEY,
@@ -478,7 +479,7 @@ class BaselineLexicalRetriever:
         # INSTANCE, not a string: the toolkit's string path omits Cohere's
         # output_dimension → 1536-dim query vectors vs the 1024-dim index.
         GraphRAGConfig.aws_region = resolve_region()
-        GraphRAGConfig.embed_model = make_llama_index_embedding(
+        GraphRAGConfig.embed_model = get_llama_index_embedding(
             model_id=os.environ.get("BEDROCK_EMBED_MODEL_ID", DEFAULT_EMBED_MODEL_ID),
             dimensions=DEFAULT_EMBED_DIMENSIONS,
             region=resolve_region(),
@@ -526,11 +527,18 @@ class BaselineLexicalRetriever:
         from graphrag_toolkit.lexical_graph.storage import GraphStoreFactory, VectorStoreFactory
 
         from .cross_script_prune import patch_cross_script_statement_prune
-        from .graphrag_patches import patch_llm_usage_accounting, patch_paginated_search_source
+        from .graphrag_patches import (
+            patch_graphrag_llm_provider,
+            patch_llm_usage_accounting,
+            patch_paginated_search_source,
+        )
 
         # Must run before any index is queried: AOSS NEXTGEN omits knn_vector from the
         # default _source, which silently collapses the TopicBeamSearch beam.
         patch_paginated_search_source()
+        # Route GraphRAG's internal LLM construction to the configured provider
+        # (OpenAI-compatible / Kilo by default — never AWS; Bedrock opt-in).
+        patch_graphrag_llm_provider()
         # Opt-in LLM cost accounting reads GraphRAG's keyword-LLM usage below its cache.
         patch_llm_usage_accounting()
         # A question in one script must not lose the statements written in another

@@ -200,17 +200,24 @@ class LlmUsageTracker:
 
 
 def record_usage(tracker: LlmUsageTracker, handle: CallHandle, usage: object) -> None:
-    """Complete ``handle`` from a Bedrock Converse ``usage`` block, or fail it when unusable."""
+    """Complete ``handle`` from a Converse or OpenAI-compatible ``usage`` block.
+
+    Accepts both shapes: Bedrock Converse (``inputTokens``/``outputTokens``) and
+    OpenAI-compatible (``prompt_tokens``/``completion_tokens``). Anything else
+    fails the call so an unreadable usage block is never silently zero-cost.
+    """
     if not isinstance(usage, dict):
         tracker.fail_call(handle, REASON_MISSING_USAGE)
         return
     if any(usage.get(name) for name in _CACHE_TOKEN_FIELDS):
         tracker.fail_call(handle, REASON_CACHE_TOKENS)
         return
-    if "inputTokens" not in usage or "outputTokens" not in usage:
+    input_tokens = usage.get("inputTokens", usage.get("prompt_tokens"))
+    output_tokens = usage.get("outputTokens", usage.get("completion_tokens"))
+    if input_tokens is None or output_tokens is None:
         tracker.fail_call(handle, REASON_MISSING_USAGE)
         return
-    tracker.complete_call(handle, usage["inputTokens"], usage["outputTokens"])
+    tracker.complete_call(handle, input_tokens, output_tokens)
 
 
 _ACTIVE: contextvars.ContextVar[LlmUsageTracker | None] = contextvars.ContextVar(

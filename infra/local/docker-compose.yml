@@ -1,0 +1,89 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Local podman stack for running COA without AWS (Phase 4 of the Kilo OpenAI shim).
+#
+# Services:
+#   localstack  — DynamoDB / S3 / SQS / SSM / Secrets Manager / STS / Cognito /
+#                 Lambda / Step Functions / CloudWatch / Athena / Glue (best-effort)
+#   opensearch  — local OpenSearch (plain HTTP, unsigned client) replacing AOSS
+#   postgres    — relational source DB the serve SQL executor talks to
+#   ollama      — local OpenAI-compatible /v1 embeddings (nomic-embed-text)
+#
+# The LLM chat path needs no container: it talks to the hosted Kilo AI Gateway
+# via the root .env (COA_LLM_BASE_URL / COA_LLM_API_KEY / COA_CHAT_MODEL).
+#
+# Bring it up:
+#   podman-compose -f infra/local/docker-compose.yml up -d
+#   podman exec -it coa-local-ollama ollama pull nomic-embed-text
+#
+# Then export the AWS/endpoint envs (see scripts/local-up.sh) and run the
+# stack. Neptune is NOT emulated: graph tiers stay remote/AWS-only for now.
+
+services:
+  localstack:
+    image: localstack/localstack:3.5.0
+    container_name: coa-local-localstack
+    environment:
+      - SERVICES=dynamodb,s3,sqs,ssm,secretsmanager,sts,lambda,stepfunctions,events,logs,cloudwatch,cognito-idp,athena,glue
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - DEBUG=0
+      - PERSISTENCE=0
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.0
+    container_name: coa-local-opensearch
+    environment:
+      - discovery.type=single-node
+      # DISABLE_SECURITY_PLUGIN is the image's documented switch; the
+      # plugins.security.disabled env duplicates it and is rejected at boot.
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  postgres:
+    image: postgres:16
+    container_name: coa-local-postgres
+    environment:
+      - POSTGRES_USER=coa
+      - POSTGRES_PASSWORD=coa
+      - POSTGRES_DB=coa
+    # Host 5433: a local Postgres commonly already owns 5432.
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coa -d coa"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  ollama:
+    image: ollama/ollama:0.5.7
+    container_name: coa-local-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  ollama:

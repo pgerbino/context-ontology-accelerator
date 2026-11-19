@@ -133,14 +133,39 @@ _ORIGINAL_ATTR = "__coa_llm_usage_original__"
 _UNACCOUNTED_LLM_METHODS = ("stream_chat", "achat", "astream_chat", "astream_complete", "acomplete")
 
 
+def _usage_from_raw(raw: object) -> dict | None:
+    """Extract a ``record_usage``-compatible usage dict from a ChatResponse.raw.
+
+    Bedrock Converse returns ``raw`` as the Converse response dict carrying a
+    ``usage`` block (``inputTokens``/``outputTokens``). The OpenAI-compatible LLM
+    returns ``raw`` as the OpenAI ``ChatCompletion`` object, whose ``usage`` is a
+    pydantic model (``prompt_tokens``/``completion_tokens``). Normalize both.
+    """
+    if isinstance(raw, dict):
+        usage = raw.get("usage")
+        return usage if isinstance(usage, dict) else None
+    usage = getattr(raw, "usage", None)
+    if usage is None:
+        return None
+    if isinstance(usage, dict):
+        return usage
+    if hasattr(usage, "model_dump"):
+        return usage.model_dump()
+    return vars(usage) if hasattr(usage, "__dict__") else None
+
+
 def patch_llm_usage_accounting() -> None:
-    """Record GraphRAG's LlamaIndex Bedrock LLM calls in the request's LLM usage tracker.
+    """Record GraphRAG's LlamaIndex LLM calls in the request's LLM usage tracker.
 
     GraphRAG's keyword provider calls its LLM through ``LLMCache.predict``, which
-    returns only text. The usage lives one level down: ``BedrockConverse.chat``
-    returns ``ChatResponse(raw=<Converse response>)`` carrying Bedrock's
-    ``inputTokens``/``outputTokens``. Wrapping ``chat`` sits BELOW the cache, so a
-    cache hit makes no provider call and correctly costs nothing.
+    returns only text. The usage lives one level down: ``chat`` returns
+    ``ChatResponse(raw=<provider response>)`` carrying the provider's usage block
+    (Bedrock Converse ``inputTokens``/``outputTokens``, or OpenAI-compatible
+    ``prompt_tokens``/``completion_tokens``). Wrapping ``chat`` sits BELOW the
+    cache, so a cache hit makes no provider call and correctly costs nothing.
+
+    The patch covers whichever LlamaIndex LLM the provider is using — the legacy
+    ``BedrockConverse`` and/or ``OpenAI`` — so a call is never unpatched.
 
     A provider call is attributed to the tracker bound on the calling thread (serve
     binds it in the lexical worker; see ``llm_usage.graphrag_retrieval``). A call
@@ -156,11 +181,6 @@ def patch_llm_usage_accounting() -> None:
     global _llm_usage_patched
     if _llm_usage_patched:
         return
-    try:
-        from llama_index.llms.bedrock_converse import BedrockConverse
-    except ImportError:
-        logger.warning("graphrag_llm_usage_patch_skipped", reason="module not importable")
-        return
 
     from ..llm_usage import (
         REASON_PROVIDER_ERROR,
@@ -171,14 +191,27 @@ def patch_llm_usage_accounting() -> None:
         record_usage,
     )
 
-    def _original(name: str):
-        method = getattr(BedrockConverse, name, None)
-        return getattr(method, _ORIGINAL_ATTR, method)
+    classes: list[type] = []
+    try:
+        from llama_index.llms.bedrock_converse import BedrockConverse
 
-    original_chat = _original("chat")
-    if original_chat is None:
-        logger.warning("graphrag_llm_usage_patch_skipped", reason="BedrockConverse.chat missing")
+        classes.append(BedrockConverse)
+    except ImportError:
+        pass
+    try:
+        from llama_index.llms.openai import OpenAI
+
+        classes.append(OpenAI)
+    except ImportError:
+        pass
+    classes = [cls for cls in classes if getattr(cls, "chat", None) is not None]
+    if not classes:
+        logger.warning("graphrag_llm_usage_patch_skipped", reason="no patcheable LLM class")
         return
+
+    def _original(cls: type, name: str):
+        method = getattr(cls, name, None)
+        return getattr(method, _ORIGINAL_ATTR, method)
 
     def _bound(original, instance):
         # LlamaIndex wraps these methods in its instrumentation dispatcher, a
@@ -186,24 +219,25 @@ def patch_llm_usage_accounting() -> None:
         # class attribute with an explicit ``self`` drops it.
         return original.__get__(instance, type(instance))
 
-    def chat(self, messages, **kwargs):
-        tracker = current_tracker()
-        if tracker is None:
-            if not is_untracked_graphrag_retrieval():
-                note_unattributed_graphrag_call()
-            return _bound(original_chat, self)(messages, **kwargs)
-        handle = tracker.register_call("graphrag_llm", str(getattr(self, "model", "")))
-        try:
-            response = _bound(original_chat, self)(messages, **kwargs)
-        except BaseException:
-            tracker.fail_call(handle, REASON_PROVIDER_ERROR)
-            raise
-        raw = getattr(response, "raw", None)
-        record_usage(tracker, handle, raw.get("usage") if isinstance(raw, dict) else None)
-        return response
+    def chat(original_chat):
+        def wrapper(self, messages, **kwargs):
+            tracker = current_tracker()
+            if tracker is None:
+                if not is_untracked_graphrag_retrieval():
+                    note_unattributed_graphrag_call()
+                return _bound(original_chat, self)(messages, **kwargs)
+            handle = tracker.register_call("graphrag_llm", str(getattr(self, "model", "")))
+            try:
+                response = _bound(original_chat, self)(messages, **kwargs)
+            except BaseException:
+                tracker.fail_call(handle, REASON_PROVIDER_ERROR)
+                raise
+            record_usage(tracker, handle, _usage_from_raw(getattr(response, "raw", None)))
+            return response
 
-    setattr(chat, _ORIGINAL_ATTR, original_chat)
-    BedrockConverse.chat = chat
+        wrapper.__name__ = "chat"
+        setattr(wrapper, _ORIGINAL_ATTR, original_chat)
+        return wrapper
 
     def _unaccounted(name: str, original):
         def method(self, *args, **kwargs):
@@ -219,13 +253,74 @@ def patch_llm_usage_accounting() -> None:
         setattr(method, _ORIGINAL_ATTR, original)
         return method
 
-    for name in _UNACCOUNTED_LLM_METHODS:
-        original = _original(name)
-        if original is not None:
-            setattr(BedrockConverse, name, _unaccounted(name, original))
+    for cls in classes:
+        original_chat = _original(cls, "chat")
+        if original_chat is None:
+            continue
+        cls.chat = chat(original_chat)
+        for name in _UNACCOUNTED_LLM_METHODS:
+            original = _original(cls, name)
+            if original is not None:
+                setattr(cls, name, _unaccounted(name, original))
 
     _llm_usage_patched = True
-    logger.info("graphrag_llm_usage_patch_applied")
+    logger.info("graphrag_llm_usage_patch_applied", classes=[cls.__name__ for cls in classes])
+
+
+_llm_provider_patched = False
+
+
+def patch_graphrag_llm_provider() -> None:
+    """Route GraphRAG's internal LLM construction to the configured provider.
+
+    graphrag-toolkit's ``GraphRAGConfig.to_llm`` builds a Bedrock Converse client
+    from a model string and only returns an ``LLM`` INSTANCE unchanged. In
+    ``openai`` mode (the default — Kilo AI Gateway, no AWS in the LLM path) we
+    install an OpenAI LLM instance on ``extraction_llm``/``response_llm`` and
+    patch ``to_llm`` so ANY internal construction point — including components
+    that bypass the config properties — receives the OpenAI instance instead of
+    a Bedrock client. ``bedrock`` mode is left untouched (legacy default).
+
+    Idempotent and failure-tolerant: if the toolkit has moved, this logs and
+    returns, leaving the legacy default in place.
+    """
+    global _llm_provider_patched
+    if _llm_provider_patched:
+        return
+    try:
+        from coa_common.llm import get_llama_index_llm
+        from graphrag_toolkit.lexical_graph.config import GraphRAGConfig
+    except ImportError:
+        logger.debug("graphrag_llm_provider_patch_skipped", reason="module not importable")
+        return
+    llm = get_llama_index_llm()
+    if llm is None:
+        return  # bedrock mode — keep the toolkit's legacy default
+
+    try:
+        from llama_index.core.llms import LLM as LlamaIndexLLM
+
+        GraphRAGConfig.extraction_llm = llm
+        GraphRAGConfig.response_llm = llm
+        original_to_llm = GraphRAGConfig.to_llm
+
+        def to_llm(self, value):
+            if isinstance(value, LlamaIndexLLM):
+                return value
+            return llm
+
+        GraphRAGConfig.to_llm = to_llm
+        GraphRAGConfig.__coa_original_to_llm__ = original_to_llm
+    except Exception as exc:  # noqa: BLE001 - degrade to legacy default, never break retrieval
+        logger.warning("graphrag_llm_provider_patch_failed", error=type(exc).__name__)
+        return
+    _llm_provider_patched = True
+    logger.info("graphrag_llm_provider_patched", provider="openai", model=str(getattr(llm, "model", "")))
+
+
+def graphrag_llm_provider_patched() -> bool:
+    """Whether GraphRAG's LLM is routed through the configured provider (see :func:`patch_graphrag_llm_provider`)."""
+    return _llm_provider_patched
 
 
 def llm_usage_patch_active() -> bool:

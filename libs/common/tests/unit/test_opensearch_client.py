@@ -55,6 +55,32 @@ def _direct_client_with_indices(indices_mock) -> AossVectorClient:
     return c
 
 
+def test_http_endpoint_builds_unsigned_local_client():
+    """Plain-http endpoints (local OpenSearch) must NOT SigV4-sign."""
+    from opensearchpy import OpenSearch
+
+    with patch("coa_common.opensearch.client.boto3.Session") as mock_session:
+        client = AossVectorClient(endpoint="http://localhost:9200", region="us-east-1", dimensions=4)
+        raw = client._c().raw
+        assert isinstance(raw, OpenSearch)
+        assert raw.transport.hosts == [{"host": "localhost", "port": 9200}]
+        # No boto3/SigV4 path is even entered for a plain-http endpoint.
+        mock_session.assert_not_called()
+
+
+def test_https_endpoint_still_signs():
+    """AOSS endpoints (https) keep the SigV4-signed transport."""
+    from opensearchpy import AWSV4SignerAuth
+
+    creds = MagicMock()
+    with patch("coa_common.opensearch.client.boto3.Session") as mock_session:
+        mock_session.return_value.get_credentials.return_value = creds
+        client = AossVectorClient(endpoint="https://x.aoss.us-west-2.on.aws", region="us-west-2", dimensions=4)
+        raw = client._c().raw
+        assert raw.transport.hosts == [{"host": "x.aoss.us-west-2.on.aws", "port": 443}]
+        mock_session.return_value.get_credentials.assert_called_once()
+
+
 class TestEnsureIndexEngineVerification:
     """ensure_index must (1) try explicit Faiss first, (2) fall back to
     method-less if the service rejects the method block, and (3) read the

@@ -158,7 +158,8 @@ class TestSqlAgentHappyPath:
         assert "max_iterations" not in strands_fake.last_agent.invoke_kwargs
 
     @pytest.mark.asyncio
-    async def test_model_and_region_reach_the_bedrock_provider(self):
+    async def test_model_and_region_reach_the_bedrock_provider(self, monkeypatch):
+        monkeypatch.setenv("COA_LLM_PROVIDER", "bedrock")
         agent, _ = _build(model_id="model-x", region="eu-west-1")
 
         install_fake_strands(lambda tools: _generate_and_execute(tools))
@@ -167,6 +168,23 @@ class TestSqlAgentHappyPath:
         kwargs = strands_fake.last_agent.model.kwargs
         assert kwargs["model_id"] == "model-x" and kwargs["region_name"] == "eu-west-1"
         assert kwargs["max_tokens"] == 4096
+
+    @pytest.mark.asyncio
+    async def test_model_reaches_the_openai_provider_by_default(self, monkeypatch):
+        monkeypatch.delenv("COA_LLM_PROVIDER", raising=False)
+        monkeypatch.setenv("COA_LLM_BASE_URL", "http://gateway.test/v1")
+        monkeypatch.setenv("COA_LLM_API_KEY", "k")
+        agent, _ = _build(model_id="model-x", region="eu-west-1")
+
+        install_fake_strands(lambda tools: _generate_and_execute(tools))
+        await _run(agent)
+
+        model = strands_fake.last_agent.model
+        assert isinstance(model, strands_fake.FakeOpenAIModel)
+        kwargs = model.kwargs
+        assert kwargs["model_id"] == "model-x"
+        assert kwargs["client_args"] == {"base_url": "http://gateway.test/v1", "api_key": "k"}
+        assert kwargs["params"] == {"max_tokens": 4096}
 
     @pytest.mark.asyncio
     async def test_exec_timeout_is_applied_per_statement(self):

@@ -43,11 +43,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 import structlog
+from coa_common.llm.openai import DEFAULT_BASE_URL, DEFAULT_CHAT_MODEL, _first_env, _normalize_base_url
 
 from ..config import env_with_legacy_name
 from ..deadline import Deadline
@@ -355,6 +357,30 @@ class SqlAgent:
         self._prefetch_schemas = prefetch_schemas if prefetch_schemas is not None else _resolve_prefetch_schemas()
         self._max_executions = max_executions if max_executions is not None else _resolve_max_executions()
 
+    def _build_model(self):
+        """Build the strands model for the configured provider.
+
+        OpenAI-compatible (Kilo AI Gateway) by default — no AWS in the LLM path;
+        ``COA_LLM_PROVIDER=bedrock`` opts back in to ``BedrockModel`` using the
+        serve region + request model, as before. Env defaults match
+        ``coa_common.llm`` so every LLM path shares the same endpoint and key.
+        """
+        from strands.models import BedrockModel, OpenAIModel
+
+        if os.environ.get("COA_LLM_PROVIDER", "openai").strip().lower() == "bedrock":
+            model_kwargs: dict[str, Any] = {"region_name": self._region, "max_tokens": _AGENT_MAX_TOKENS}
+            if self._model_id:
+                model_kwargs["model_id"] = self._model_id
+            return BedrockModel(**model_kwargs)
+        return OpenAIModel(
+            model_id=self._model_id or _first_env(DEFAULT_CHAT_MODEL, "KILO_MODEL", "COA_CHAT_MODEL", "COA_LLM_MODEL"),
+            params={"max_tokens": _AGENT_MAX_TOKENS},
+            client_args={
+                "base_url": _normalize_base_url(_first_env(DEFAULT_BASE_URL, "KILO_BASE_URL", "COA_LLM_BASE_URL")),
+                "api_key": _first_env("local", "KILO_API_KEY", "COA_LLM_API_KEY"),
+            },
+        )
+
     async def _prefetch_context(self, question: str) -> str:
         """Search once on the raw question and inline the top tables' schemas.
 
@@ -441,7 +467,6 @@ class SqlAgent:
         t_start = time.perf_counter()
         try:
             from strands import Agent, tool
-            from strands.models import BedrockModel
         except ImportError as e:  # pragma: no cover - dependency always present in the runtime image
             logger.warning("agentic_strands_unavailable", error=str(e))
             return SqlAgentOutcome(unavailable=True, duration_ms=int((time.perf_counter() - t_start) * 1000))
@@ -712,17 +737,16 @@ class SqlAgent:
                 {"row_count": result.row_count, "columns": result.columns, "preview": preview}, default=str
             )
 
-        # BedrockModel uses the same region as the serve LLM client + the request's model.
-        model_kwargs: dict[str, Any] = {"region_name": self._region, "max_tokens": _AGENT_MAX_TOKENS}
-        if self._model_id:
-            model_kwargs["model_id"] = self._model_id
+        # The model follows the configured provider: OpenAI-compatible (Kilo) by
+        # default — no AWS in the LLM path — with Bedrock as an explicit opt-in.
+        model = self._build_model()
         # The graph tool is offered ONLY when one is wired: with no graph client the
         # agent sees the same four tools and the same prompt text as baseline.
         tools = [search_tables, get_table_schema, generate_sql, execute_sql]
         if self._graph is not None:
             tools.insert(2, explore_graph)
         agent = Agent(
-            model=BedrockModel(**model_kwargs),
+            model=model,
             tools=tools,
             system_prompt=build_system_prompt(self._intent_review),
         )

@@ -68,6 +68,23 @@ load-test:
 		uv run pytest tests/integ/load/ -q -m "not slow" --rung $(or $(RUNG),50); \
 	else echo "⚠ load tests not available (stripped from public mirror)"; fi
 
+## Local podman stack (no AWS): LocalStack + OpenSearch + Postgres + Ollama.
+## See infra/local/docker-compose.yml. After `make local-up`, source the envs
+## (eval "$(scripts/local-env.sh)") and pull the embed model:
+##   podman exec coa-local-ollama ollama pull nomic-embed-text
+local-up:
+	podman-compose -f infra/local/docker-compose.yml up -d
+
+local-down:
+	podman-compose -f infra/local/docker-compose.yml down
+
+local-env:
+	@cat scripts/local-env.sh
+
+## Smoke-check the local no-AWS stack (LocalStack/OpenSearch/Postgres/Ollama).
+local-smoke:
+	@eval "$$(scripts/local-env.sh)" && scripts/local-smoke.sh
+
 load-test-slow:
 	@if [ -d tests/integ/load ]; then \
 		uv run pytest tests/integ/load/ -q -m slow --rung $(or $(RUNG),500); \

@@ -47,6 +47,8 @@ dependencies = [
     # emSign intermediates. botocore also uses certifi's bundle over its own when installed.
     "certifi>=2026.10.19",
     "pyparsing>=3.3.2",
+    "llama-index-llms-openai>=0.5",
+    "openai>=1.0",
 ]
 
 [build-system]

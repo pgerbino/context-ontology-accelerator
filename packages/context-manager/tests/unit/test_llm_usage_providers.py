@@ -468,12 +468,14 @@ class TestGraphragUsage:
 
         assert tracker.snapshot().input_tokens == 640  # recorded once, not twice
 
-    def test_patch_stays_inactive_when_chat_is_missing(self, monkeypatch) -> None:
+    def test_patch_stays_inactive_when_no_llm_class_is_patcheable(self, monkeypatch) -> None:
         from coa_serve.lexical import graphrag_patches
         from llama_index.llms.bedrock_converse import BedrockConverse
+        from llama_index.llms.openai import OpenAI
 
         monkeypatch.setattr(graphrag_patches, "_llm_usage_patched", False)
         monkeypatch.setattr(BedrockConverse, "chat", None)
+        monkeypatch.setattr(OpenAI, "chat", None)
 
         graphrag_patches.patch_llm_usage_accounting()
 

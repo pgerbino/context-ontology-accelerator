@@ -11,7 +11,7 @@ from collections import Counter
 from coa_common.bedrock import BedrockTruncationError
 from coa_common.domain_models import EnrichmentSource, ForeignKey, Table
 
-from coa_sources.database.enrichment.bedrock_client import BedrockClient
+from coa_sources.database.enrichment.bedrock_client import LLMClient
 from coa_sources.database.pipeline.enrichment_metrics import EnrichmentMetricEmitter
 
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ def build_relationship_prompt(tables: list[Table]) -> str:
     return prompt
 
 
-def infer_relationships(tables: list[Table], client: BedrockClient, emitter: EnrichmentMetricEmitter) -> list[dict]:
+def infer_relationships(tables: list[Table], client: LLMClient, emitter: EnrichmentMetricEmitter) -> list[dict]:
     """Invoke Bedrock to infer cross-table FK relationships.
 
     For sources with ≤TABLES_PER_BATCH tables, makes a single Bedrock call.
@@ -121,7 +121,7 @@ def infer_relationships(tables: list[Table], client: BedrockClient, emitter: Enr
 def _infer_batch_raw(
     system_prompt: str,
     user_prompt: str,
-    client: BedrockClient,
+    client: LLMClient,
     emitter: EnrichmentMetricEmitter,
     *,
     stage: str,
@@ -143,7 +143,7 @@ def _infer_batch_raw(
     return invocation.result
 
 
-def _infer_batch(tables: list[Table], client: BedrockClient, emitter: EnrichmentMetricEmitter) -> list[dict]:
+def _infer_batch(tables: list[Table], client: LLMClient, emitter: EnrichmentMetricEmitter) -> list[dict]:
     """Single Bedrock call for one batch of tables."""
     user_prompt = build_relationship_prompt(tables)
     try:

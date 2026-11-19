@@ -29,7 +29,6 @@ from coa_common.sparql_config import graph_sources_enabled
 from pydantic import ValidationError
 
 from .clients.athena import AthenaQueryExecutor
-from .clients.bedrock import BedrockLLMClient
 from .clients.composite_executor import CompositeQueryExecutor
 from .clients.neptune import NeptuneGraphClient
 from .clients.opensearch import OpenSearchVectorClient
@@ -248,7 +247,9 @@ async def _ensure_initialized():
         # Build client layer
         neptune_client = NeptuneGraphClient(endpoint=config.neptune_endpoint)
         opensearch_client = OpenSearchVectorClient(endpoint=config.opensearch_endpoint)
-        bedrock_client = BedrockLLMClient(model_id=config.bedrock_model_id, region=config.bedrock_region)
+        from .clients.factory import build_llm_client
+
+        bedrock_client = build_llm_client(model_id=config.bedrock_model_id, region=config.bedrock_region)
         # VKG endpoint used as template: "://vkg." is replaced with "://vkg-{ns}." per request
 
         from .clients.sources_registry import SourcesRegistry

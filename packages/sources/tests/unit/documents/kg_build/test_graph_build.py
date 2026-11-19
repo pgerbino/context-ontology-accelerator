@@ -880,6 +880,13 @@ class TestRunSeparated:
 
 
 class TestGraphRAGConfig:
+    @pytest.fixture(autouse=True)
+    def _bedrock_provider(self, monkeypatch):
+        # These tests exercise the legacy Bedrock extraction-LLM config path
+        # (BEDROCK_MODEL_ARN → BedrockConverse instance); opt out of the default
+        # OpenAI-compatible provider so _setup_graphrag takes that branch.
+        monkeypatch.setenv("COA_LLM_PROVIDER", "bedrock")
+
     @patch("graphrag_toolkit.lexical_graph.indexing.build.Checkpoint")
     @patch("graphrag_toolkit.lexical_graph.storage.VectorStoreFactory")
     @patch("graphrag_toolkit.lexical_graph.storage.GraphStoreFactory")
@@ -957,6 +964,12 @@ class TestGraphRAGConfig:
 
 class TestExtractionClientConfig:
     """The botocore Config the extraction client is built with."""
+
+    @pytest.fixture(autouse=True)
+    def _bedrock_provider(self, monkeypatch):
+        # These tests exercise the legacy Bedrock extraction-client path; opt out
+        # of the default OpenAI-compatible provider so _setup_graphrag takes it.
+        monkeypatch.setenv("COA_LLM_PROVIDER", "bedrock")
 
     @staticmethod
     def _config_for(mod, _cfg, mock_gsf, mock_vsf, mock_idx_cls, monkeypatch, threads: int):

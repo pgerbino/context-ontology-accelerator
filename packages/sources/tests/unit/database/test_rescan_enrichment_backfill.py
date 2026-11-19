@@ -380,7 +380,7 @@ def _bedrock_result() -> BedrockInvocationResult:
 class TestEnrichmentFillsBackfilledTables:
     @patch(f"{ENRICHER}._write_enriched_assets")
     @patch(f"{ENRICHER}.read_assets_for_datasource")
-    @patch(f"{ENRICHER}.BedrockClient")
+    @patch(f"{ENRICHER}.get_llm_client")
     def test_empty_items_are_filled_for_review_and_curated_items_are_untouched(
         self, client_cls: MagicMock, read: MagicMock, write: MagicMock
     ) -> None:

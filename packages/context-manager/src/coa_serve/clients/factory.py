@@ -106,8 +106,29 @@ def build_clients() -> ClientSet:
     return _build_default_clients()
 
 
+def build_llm_client(model_id: str | None = None, region: str | None = None):
+    """Build the LLM client for the configured provider.
+
+    OpenAI-compatible (Kilo AI Gateway) by default — no AWS in the LLM path;
+    ``COA_LLM_PROVIDER=bedrock`` opts back in to the legacy ``BedrockLLMClient``.
+    Both implementations expose the same surface, so callers are unchanged.
+    """
+    if os.environ.get("COA_LLM_PROVIDER", "openai").strip().lower() == "bedrock":
+        from .bedrock import BedrockLLMClient
+
+        return BedrockLLMClient(model_id=model_id, region=region)
+
+    from .openai import OpenAICompatibleLLMClient
+
+    # OpenAI-compatible (Kilo) path: COA_CHAT_MODEL is authoritative for the
+    # gateway model; the deployment's bedrock_model_id is a Bedrock ARN and only
+    # falls through as the model when no gateway model is configured.
+    if os.environ.get("COA_CHAT_MODEL"):
+        model_id = None
+    return OpenAICompatibleLLMClient(model_id=model_id, region=region)
+
+
 def _build_default_clients() -> ClientSet:
-    from .bedrock import BedrockLLMClient
     from .neptune import NeptuneGraphClient
     from .opensearch import OpenSearchVectorClient
     from .source_db import SourceDBQueryExecutor
@@ -115,7 +136,7 @@ def _build_default_clients() -> ClientSet:
     return ClientSet(
         graph=NeptuneGraphClient(),
         vector=OpenSearchVectorClient(),
-        llm=BedrockLLMClient(),
+        llm=build_llm_client(),
         # Executes authorized SQL against customer relational databases
         # (PostgreSQL via asyncpg, Athena for cross-source federation).
         query_executor=SourceDBQueryExecutor(),

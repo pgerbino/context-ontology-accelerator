@@ -96,7 +96,7 @@ class TestRunUsesNamespaceLanguage:
     @patch("coa_sources.database.enrichment.relationship_inferrer.infer_relationships", return_value=[])
     @patch(f"{_ENRICHER}._write_enriched_assets")
     @patch(f"{_ENRICHER}.read_assets_for_datasource")
-    @patch(f"{_ENRICHER}.BedrockClient")
+    @patch(f"{_ENRICHER}.get_llm_client")
     def _run(self, language, mock_client_cls, mock_read, _write, _pass2):
         mock_client_cls.return_value.invoke.return_value = BedrockInvocationResult(
             result=_model_result(), input_tokens=1, output_tokens=1, latency_ms=1.0

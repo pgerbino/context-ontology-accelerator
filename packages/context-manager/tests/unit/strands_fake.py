@@ -49,6 +49,13 @@ class FakeBedrockModel:
         self.kwargs = kwargs
 
 
+class FakeOpenAIModel:
+    """Stands in for ``strands.models.OpenAIModel``; records its kwargs."""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
 def install_fake_strands(driver: Callable[[dict], Awaitable[None]]) -> None:
     """Install the fake ``strands`` modules, routing the agent loop to ``driver``.
 
@@ -70,6 +77,7 @@ def install_fake_strands(driver: Callable[[dict], Awaitable[None]]) -> None:
     strands.Agent = agent_factory
     strands.tool = tool
     strands_models.BedrockModel = FakeBedrockModel
+    strands_models.OpenAIModel = FakeOpenAIModel
     sys.modules["strands"] = strands
     sys.modules["strands.models"] = strands_models
 

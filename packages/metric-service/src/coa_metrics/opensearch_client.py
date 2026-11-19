@@ -35,9 +35,9 @@ from coa_common import (
     DEFAULT_EMBED_MODEL_ID,
     GOVERNED_METRICS_ONTOLOGY_ID,
     AossVectorClient,
-    BedrockEmbedder,
     ontology_vector_index_name,
 )
+from coa_common.llm import Embedder, get_embedder
 from coa_common.opensearch import DeleteIncompleteError
 
 from coa_metrics.neptune_client import MetricDefinition, _metric_uri
@@ -56,15 +56,15 @@ BEDROCK_MODEL_ID = os.getenv("BEDROCK_EMBED_MODEL_ID", os.getenv("BEDROCK_MODEL_
 BEDROCK_REGION = os.getenv("BEDROCK_REGION", os.getenv("AWS_REGION", "us-east-1"))
 
 
-# ── Bedrock embedding ───────────────────────────────────────────────────
+# ── Embeddings ────────────────────────────────────────────────────────────
 
 
-def _make_embedder() -> BedrockEmbedder:
+def _make_embedder() -> Embedder:
     """Shared embedder — same model/dimensions as ontology + serve."""
-    return BedrockEmbedder(model_id=BEDROCK_MODEL_ID, dimensions=OSS_DIMENSIONS, region=BEDROCK_REGION)
+    return get_embedder(model_id=BEDROCK_MODEL_ID, dimensions=OSS_DIMENSIONS, region=BEDROCK_REGION)
 
 
-def _generate_embedding(text: str, embedder: BedrockEmbedder | None = None) -> list[float]:
+def _generate_embedding(text: str, embedder: Embedder | None = None) -> list[float]:
     """Generate a metric embedding. Metric text is indexable content → document."""
     return (embedder or _make_embedder()).embed_document(text)
 
@@ -98,7 +98,7 @@ class MetricOpenSearchClient:
     def __init__(self) -> None:
         """Initialize with lazily constructed AOSS client and embedder."""
         self._client: AossVectorClient | None = None
-        self._embedder: BedrockEmbedder | None = None
+        self._embedder: Embedder | None = None
 
     def _aoss(self) -> AossVectorClient:
         if self._client is None:
@@ -112,7 +112,7 @@ class MetricOpenSearchClient:
             )
         return self._client
 
-    def _embedder_client(self) -> BedrockEmbedder:
+    def _embedder_client(self) -> Embedder:
         if self._embedder is None:
             self._embedder = _make_embedder()
         return self._embedder

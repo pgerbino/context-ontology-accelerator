@@ -105,8 +105,8 @@ from coa_common.constants import (
     validate_id,
 )
 from coa_common.dao import DynamoDBDAO
-from coa_common.embeddings import make_llama_index_embedding
 from coa_common.language_tags import describe_language, needs_language_instruction
+from coa_common.llm import get_llama_index_embedding, get_llama_index_llm
 from coa_common.logging import setup_logging
 from coa_common.s3 import get_s3_client, list_objects, read_file_bytes
 from coa_control_plane_server.models.source_status import SourceStatus
@@ -1093,11 +1093,18 @@ def _setup_graphrag(tenant_id: str):
     # builds a llama_index BedrockEmbedding whose Cohere request omits
     # output_dimension → Cohere v4 returns 1536-dim vectors instead of the
     # configured 1024, mismatching the index. The instance controls the request.
-    GraphRAGConfig.embed_model = make_llama_index_embedding(
+    GraphRAGConfig.embed_model = get_llama_index_embedding(
         model_id=BEDROCK_EMBED_MODEL_ID, dimensions=BEDROCK_EMBED_DIMENSIONS, region=AWS_REGION
     )
     GraphRAGConfig.embed_dimensions = BEDROCK_EMBED_DIMENSIONS
-    if BEDROCK_MODEL_ARN:
+    _extraction_llm = get_llama_index_llm()
+    if _extraction_llm is not None:
+        # OpenAI-compatible provider (Kilo by default — no AWS in the LLM path).
+        # Pass an LLM INSTANCE so the toolkit's to_llm() returns it unchanged
+        # instead of building a Bedrock Converse client. The OpenAI LLM pickles
+        # cleanly (plain pydantic fields), which is all the fan-out workers need.
+        GraphRAGConfig.extraction_llm = _extraction_llm
+    elif BEDROCK_MODEL_ARN:
         # Pass the extraction LLM as an INSTANCE, not a model string and not a JSON
         # config. All three reach BedrockConverse, but only the instance carries a
         # timeout: to_llm() (config.py) reads just model/temperature/max_tokens/

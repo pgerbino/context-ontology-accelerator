@@ -1,10 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Bedrock text-embeddings client for ontology induction.
+"""Text-embeddings client for ontology induction.
 
-Thin adapter over the shared :class:`~coa_common.BedrockEmbedder`
-(single source of truth for the embedding model) that preserves the
+Thin adapter over the shared provider-aware embedder (:func:`coa_common.llm.get_embedder`
+— Kilo OpenAI-compatible by default, Bedrock opt-in) that preserves the
 ``EmbeddingGeneratorClient.generate_lexical()`` interface the inducer expects.
 
 Class labels are indexable content, so they are embedded as *documents*; the
@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import re
 
-from coa_common import DEFAULT_EMBED_DIMENSIONS, DEFAULT_EMBED_MODEL_ID, BedrockEmbedder
+from coa_common import DEFAULT_EMBED_DIMENSIONS, DEFAULT_EMBED_MODEL_ID
 from coa_common.bedrock_metrics import CostTracker
+from coa_common.llm import Embedder, get_embedder
 
 _MAX_WORKERS = 10
 
@@ -27,7 +28,7 @@ def _split_camel(s: str) -> str:
 
 
 class BedrockEmbeddingClient:
-    """Drop-in replacement for EmbeddingGeneratorClient over BedrockEmbedder."""
+    """Drop-in replacement for EmbeddingGeneratorClient over the shared embedder."""
 
     def __init__(
         self,
@@ -35,16 +36,17 @@ class BedrockEmbeddingClient:
         model_id: str = DEFAULT_EMBED_MODEL_ID,
         dimensions: int = DEFAULT_EMBED_DIMENSIONS,
     ):
-        """Construct the client and its underlying Bedrock embedder.
+        """Construct the client and its underlying embedder.
 
         Args:
-            region: AWS region for the Bedrock runtime client.
-            model_id: Bedrock embedding model identifier.
+            region: Accepted for Bedrock compatibility; unused by the OpenAI provider.
+            model_id: Embedding model identifier (Bedrock id, or gateway id when
+                ``COA_LLM_PROVIDER=openai`` and ``COA_EMBED_MODEL`` is unset).
             dimensions: Output embedding dimensionality.
         """
         self.model_id = model_id
         self.dimensions = dimensions
-        self._embedder = BedrockEmbedder(
+        self._embedder: Embedder = get_embedder(
             model_id=model_id, dimensions=dimensions, region=region, max_workers=_MAX_WORKERS
         )
 

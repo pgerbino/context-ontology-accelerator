@@ -26,7 +26,7 @@ import boto3
 import structlog
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError
-from coa_common import BedrockEmbedder, resolve_region
+from coa_common import resolve_region
 from coa_common.constants import DEFAULT_EMBED_MODEL_ID
 from coa_common.guardrail_metrics import (
     COMPONENT_NL_TO_SPARQL,
@@ -39,6 +39,7 @@ from coa_common.guardrail_metrics import (
     emit_guardrail_decision,
     filter_type_from_assessments,
 )
+from coa_common.llm import get_embedder
 
 from ..llm_usage import (
     REASON_MISSING_USAGE,
@@ -345,8 +346,9 @@ class BedrockLLMClient:
         self._embed_model_id = embed_model_id or os.environ.get("BEDROCK_EMBED_MODEL_ID", DEFAULT_EMBED_MODEL_ID)
         self._region = region or os.environ.get("BEDROCK_REGION", resolve_region())
         # Query embeddings go through the shared embedder so serve uses the SAME
-        # model (and Cohere search_query input_type) as ingestion.
-        self._embedder = BedrockEmbedder(model_id=self._embed_model_id, region=self._region)
+        # model as ingestion (Cohere search_query input_type via Bedrock, or the
+        # configured OpenAI-compatible endpoint).
+        self._embedder = get_embedder(model_id=self._embed_model_id, region=self._region)
         self._guardrail_version = guardrail_version or os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
         self._client: Any = None
         self._client_lock = threading.Lock()

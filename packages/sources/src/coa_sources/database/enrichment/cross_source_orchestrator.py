@@ -27,7 +27,7 @@ from coa_common.dao import DynamoDBDAO, QueryParams
 from coa_common.domain_models import Table
 from coa_control_plane_server.models.source_status import SourceStatus
 
-from coa_sources.database.enrichment.bedrock_client import BedrockClient
+from coa_sources.database.enrichment.bedrock_client import LLMClient, get_llm_client
 from coa_sources.database.enrichment.cross_source_relationship_inferrer import (
     apply_cross_source_relationships,
     infer_cross_source_relationships,
@@ -100,7 +100,7 @@ def run_cross_source_inference(
     datasource_ids: list[str],
     read_tables: Callable[[str], list[Table]],
     write_tables: Callable[[list[Table]], None],
-    client: BedrockClient,
+    client: LLMClient,
     emitter: EnrichmentMetricEmitter,
     focus_datasource_id: str | None = None,
 ) -> dict:
@@ -197,7 +197,7 @@ def run_for_namespace(
     region: str,
     sources_table: str,
     emitter: EnrichmentMetricEmitter,
-    client: BedrockClient | None = None,
+    client: LLMClient | None = None,
     dao: DynamoDBDAO | None = None,
     focus_datasource_id: str | None = None,
 ) -> dict:
@@ -234,7 +234,7 @@ def run_for_namespace(
 
         if client is None:
             try:
-                client = BedrockClient(read_timeout=TABLE_TIMEOUT_SEC, guardrail_id=_resolve_guardrail_id())
+                client = get_llm_client(read_timeout=TABLE_TIMEOUT_SEC, guardrail_id=_resolve_guardrail_id())
             except Exception:
                 # IAM / network / guardrail misconfiguration. Log with context and
                 # surface a metric; re-raise so the caller's non-fatal boundary

@@ -13,9 +13,10 @@ import os
 import re
 
 import boto3
-from coa_common.bedrock import DEFAULT_MODEL_ID, BedrockClient
+from coa_common.bedrock import DEFAULT_MODEL_ID
 from coa_common.config import resolve_region
 from coa_common.guardrail_metrics import COMPONENT_ONTOLOGY_SHAPES
+from coa_common.llm import LLMClient, get_llm_client
 
 from coa_ontology.validation.shapes.config import (
     ClassConstraints,
@@ -129,13 +130,13 @@ def infer_constraints_from_ontology(
     existing_config: ConstraintConfig | None = None,
     region: str | None = None,
     model_id: str = DEFAULT_MODEL_ID,
-    client: BedrockClient | None = None,
+    client: LLMClient | None = None,
 ) -> ConstraintConfig:
     """LLM reads the ontology and proposes semantic constraints beyond DB schema.
 
-    Uses the shared ``BedrockClient`` (lib/common) for the LLM call — it parses
-    the JSON response and strips markdown fences. ``client`` is injectable for
-    testing.
+    Uses the shared LLM client (``coa_common.llm`` — Bedrock by default, see
+    ``COA_LLM_PROVIDER``) for the LLM call — it parses the JSON response and
+    strips markdown fences. ``client`` is injectable for testing.
 
     ``region`` defaults to the task's real Bedrock region (see
     :func:`_default_bedrock_region`) rather than a hardcoded us-east-1 — the sole
@@ -173,7 +174,7 @@ def infer_constraints_from_ontology(
         "Propose semantic constraints (JSON):"
     )
 
-    bedrock = client or BedrockClient(
+    bedrock = client or get_llm_client(
         region=region or _default_bedrock_region(),
         model_id=model_id,
         guardrail_id=_resolve_guardrail_id(),
